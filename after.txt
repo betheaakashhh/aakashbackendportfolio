@@ -11,7 +11,6 @@ const app = express();
 console.log('Environment check:');
 console.log('MONGODB_URI:', process.env.MONGODB_URI ? '✓ Loaded' : '✗ Missing');
 console.log('JWT_SECRET:', process.env.JWT_SECRET ? '✓ Loaded' : '✗ Missing');
-console.log('ADMIN_SECRET:', process.env.ADMIN_SECRET ? '✓ Loaded' : '✗ Missing');
 console.log('PORT:', process.env.PORT || 5000);
 
 // Middleware
@@ -22,7 +21,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5173', 
   'http://localhost:5174',
-  'http://localhost:3001',
+  'http://localhost:3001', // Admin panel
   process.env.FRONTEND_URL,
   process.env.ADMIN_URL
 ].filter(Boolean);
@@ -68,7 +67,7 @@ const connectDB = async () => {
   }
 };
 
-// User Schema with role field
+// User Schema
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -94,30 +93,17 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     enum: ['client', 'admin'],
-    default: 'client',
-    required: true  // Make it required so it's always set
+    default: 'client'
   },
   createdAt: {
     type: Date,
     default: Date.now
-  },
-  phone: { type: String, default: '' },
-company: { type: String, default: '' },
-country: { type: String, default: '' },
-city: { type: String, default: '' },
-projectExperience: { type: String, default: '' },
-contactMethod: {
-  type: String,
-  enum: ['email', 'phone', 'whatsapp'],
-  default: 'email'
-},
-budgetPreference: { type: String, default: '' }
-
+  }
 });
 
 const User = mongoose.model('User', userSchema);
 
-// Project Request Schema (Enhanced)
+// Enhanced Project Request Schema
 const projectRequestSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -158,16 +144,19 @@ const projectRequestSchema = new mongoose.Schema({
     enum: ['requested', 'accepted', 'negotiable', 'rejected'],
     default: 'requested'
   },
+  // Negotiation fields
   negotiation: {
     proposedBudget: Number,
     proposedDuration: String,
     adminNotes: String,
     negotiatedAt: Date
   },
+  // Rejection fields
   rejection: {
     reason: String,
     rejectedAt: Date
   },
+  // Payment tracking (when accepted)
   payment: {
     finalBudget: Number,
     paidAmount: {
@@ -181,28 +170,13 @@ const projectRequestSchema = new mongoose.Schema({
       note: String
     }]
   },
+  // Project timeline (when accepted)
   timeline: {
     startDate: Date,
     deadline: Date,
     completedDate: Date
   },
-  commits: [{
-    weekNumber: {
-      type: Number,
-      required: true
-    },
-    description: {
-      type: String,
-      required: true
-    },
-    completedTasks: [{
-      type: String
-    }],
-    date: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+  // Notification flags
   hasUnreadUpdate: {
     type: Boolean,
     default: false
@@ -226,7 +200,6 @@ const ProjectRequest = mongoose.model('ProjectRequest', projectRequestSchema);
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your-fallback-secret-key-for-development-only-change-in-production';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'super-secret-admin-key-change-in-production';
 
 // Middleware to verify token
 const verifyToken = (req, res, next) => {
@@ -240,7 +213,7 @@ const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     req.userId = decoded.userId;
-    req.userRole = decoded.role || 'client'; // Default to client if no role
+    req.userRole = decoded.role;
     next();
   } catch (error) {
     console.error('Token verification error:', error);
@@ -256,8 +229,9 @@ const verifyAdmin = (req, res, next) => {
   next();
 };
 
-// ==================== HEALTH & MIGRATION ROUTES ====================
+// ==================== ROUTES ====================
 
+// Health Check
 app.get('/', (req, res) => {
   res.json({ 
     message: 'Portfolio API is running',
@@ -273,39 +247,11 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 🔧 MIGRATION ENDPOINT - Run this ONCE to fix existing users
-app.post('/api/migrate/fix-user-roles', async (req, res) => {
-  try {
-    // Update all users without role field to 'client'
-    const result = await User.updateMany(
-      { role: { $exists: false } },
-      { $set: { role: 'client' } }
-    );
-    
-    console.log('✅ Migration completed:', result.modifiedCount, 'users updated');
-    
-    res.json({
-      success: true,
-      message: 'Migration completed successfully',
-      modifiedCount: result.modifiedCount,
-      instructions: 'All existing users have been set to role: client'
-    });
-  } catch (error) {
-    console.error('❌ Migration error:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Migration failed',
-      error: error.message 
-    });
-  }
-});
-
 // ==================== AUTH ROUTES ====================
 
-// CLIENT SIGNUP - Regular user registration
+// Client Signup
 app.post('/api/auth/signup', async (req, res) => {
   try {
-    console.log('📝 Client signup request:', req.body);
     const { name, email, password, contact } = req.body;
 
     if (!name || !email || !password) {
@@ -323,17 +269,15 @@ app.post('/api/auth/signup', async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user with explicit role: 'client'
     const user = new User({
       name,
       email,
       password: hashedPassword,
       contact: contact || '',
-      role: 'client'  // Explicitly set role
+      role: 'client'
     });
 
     await user.save();
-    console.log('✅ Client created:', user.email, 'with role:', user.role);
 
     const token = jwt.sign(
       { userId: user._id, role: user.role },
@@ -352,75 +296,14 @@ app.post('/api/auth/signup', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Signup error:', error);
+    console.error('Signup error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// ADMIN SIGNUP - Admin registration with secret key
-app.post('/api/auth/admin/signup', async (req, res) => {
-  try {
-    console.log('📝 Admin signup request:', req.body);
-    const { name, email, password, adminSecret, contact } = req.body;
-
-    // Verify admin secret key
-    if (adminSecret !== ADMIN_SECRET) {
-      return res.status(403).json({ message: 'Invalid admin secret key' });
-    }
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'Email already registered' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create admin with explicit role: 'admin'
-    const admin = new User({
-      name,
-      email,
-      password: hashedPassword,
-      contact: contact || '',
-      role: 'admin'  // Explicitly set role as admin
-    });
-
-    await admin.save();
-    console.log('✅ Admin created:', admin.email, 'with role:', admin.role);
-
-    const token = jwt.sign(
-      { userId: admin._id, role: admin.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({
-      message: 'Admin created successfully',
-      token,
-      user: {
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        role: admin.role
-      }
-    });
-  } catch (error) {
-    console.error('❌ Admin signup error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// UNIVERSAL LOGIN - For both clients and admins
+// Login (Client & Admin)
 app.post('/api/auth/login', async (req, res) => {
   try {
-    console.log('🔐 Login request:', req.body.email);
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -436,15 +319,6 @@ app.post('/api/auth/login', async (req, res) => {
     if (!isValidPassword) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-
-    // 🔧 FIX: If user doesn't have role (old users), set to 'client'
-    if (!user.role) {
-      console.log('⚠️ User missing role, setting to client:', user.email);
-      user.role = 'client';
-      await user.save();
-    }
-
-    console.log('✅ Login successful:', user.email, 'Role:', user.role);
 
     const token = jwt.sign(
       { userId: user._id, role: user.role },
@@ -463,7 +337,7 @@ app.post('/api/auth/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Login error:', error);
+    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -475,38 +349,12 @@ app.get('/api/auth/profile', verifyToken, async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-
-    // 🔧 FIX: Ensure role exists
-    if (!user.role) {
-      user.role = 'client';
-      await user.save();
-    }
-
     res.json(user);
   } catch (error) {
     console.error('Profile error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
-//api auth profile update
-// UPDATE PROFILE
-app.put('/api/auth/profile/update', verifyToken, async (req, res) => {
-  try {
-    const updatedUser = await User.findByIdAndUpdate(
-      req.userId,
-      { $set: req.body },
-      { new: true }
-    ).select('-password');
-
-    res.json({
-      message: 'Profile updated successfully',
-      user: updatedUser
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
 
 // Verify Token
 app.get('/api/auth/verify', verifyToken, (req, res) => {
@@ -528,14 +376,11 @@ app.post('/api/auth/logout', (req, res) => {
 // Submit New Project Request
 app.post('/api/projects/requests', verifyToken, async (req, res) => {
   try {
-    console.log('📝 Project request received:', req.body);
     const { projectName, duration, budget, tools, projectType, description, attachmentLink } = req.body;
 
-   if (!attachmentLink && (!projectName || !duration || !budget || !tools || !projectType || !description)) {
-  return res.status(400).json({ message: 'Upload document or fill all fields' });
-}
- 
- 
+    if (!projectName || !duration || !budget || !tools || !projectType || !description) {
+      return res.status(400).json({ message: 'All required fields must be filled' });
+    }
 
     const projectRequest = new ProjectRequest({
       userId: req.userId,
@@ -659,6 +504,7 @@ app.get('/api/admin/clients', verifyToken, verifyAdmin, async (req, res) => {
       .select('-password')
       .sort({ createdAt: -1 });
 
+    // Get project statistics for each client
     const clientsWithStats = await Promise.all(clients.map(async (client) => {
       const totalProjects = await ProjectRequest.countDocuments({ userId: client._id });
       const requestedProjects = await ProjectRequest.countDocuments({ userId: client._id, status: 'requested' });
@@ -666,6 +512,7 @@ app.get('/api/admin/clients', verifyToken, verifyAdmin, async (req, res) => {
       const rejectedProjects = await ProjectRequest.countDocuments({ userId: client._id, status: 'rejected' });
       const negotiableProjects = await ProjectRequest.countDocuments({ userId: client._id, status: 'negotiable' });
 
+      // Calculate financial stats
       const acceptedProjectsData = await ProjectRequest.find({ 
         userId: client._id, 
         status: 'accepted',
@@ -736,6 +583,7 @@ app.get('/api/admin/clients/:id', verifyToken, verifyAdmin, async (req, res) => 
 app.get('/api/admin/projects/requests', verifyToken, verifyAdmin, async (req, res) => {
   try {
     const { status } = req.query;
+    
     const filter = status ? { status } : {};
     
     const projects = await ProjectRequest.find(filter)
@@ -914,42 +762,20 @@ app.post('/api/admin/projects/requests/:id/payment', verifyToken, verifyAdmin, a
   }
 });
 
-app.post('/api/admin/projects/requests/:id/commit', verifyToken, verifyAdmin, async (req, res) => {
+// Update Project Timeline
+app.put('/api/admin/projects/requests/:id/timeline', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { weekNumber, description, completedTasks } = req.body;
-
-    if (!weekNumber || !description) {
-      return res.status(400).json({ message: 'Week number and description are required' });
-    }
+    const { startDate, deadline, completedDate } = req.body;
 
     const project = await ProjectRequest.findById(req.params.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    if (project.status !== 'accepted') {
-      return res.status(400).json({ message: 'Can only add commits to accepted projects' });
-    }
-
-    // Check if week number already exists
-    const existingCommit = project.commits.find(c => c.weekNumber === parseInt(weekNumber));
-    if (existingCommit) {
-      return res.status(400).json({ message: `Week ${weekNumber} already has a progress update` });
-    }
-
-    const newCommit = {
-      weekNumber: parseInt(weekNumber),
-      description,
-      completedTasks: completedTasks || [],
-      date: new Date()
-    };
-
-    // Initialize commits array if it doesn't exist
-    if (!project.commits) {
-      project.commits = [];
-    }
-
-    project.commits.push(newCommit);
+    if (startDate) project.timeline.startDate = new Date(startDate);
+    if (deadline) project.timeline.deadline = new Date(deadline);
+    if (completedDate) project.timeline.completedDate = new Date(completedDate);
+    
     project.hasUnreadUpdate = true;
     project.lastUpdatedBy = 'admin';
     project.updatedAt = new Date();
@@ -957,132 +783,11 @@ app.post('/api/admin/projects/requests/:id/commit', verifyToken, verifyAdmin, as
     await project.save();
 
     res.json({
-      message: 'Progress update added successfully',
+      message: 'Timeline updated successfully',
       project
     });
   } catch (error) {
-    console.error('Add commit error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Get All Commits for a Project (Both Client and Admin)
-app.get('/api/projects/:id/commits', verifyToken, async (req, res) => {
-  try {
-    const project = await ProjectRequest.findById(req.params.id);
-    
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    // Verify user has access to this project
-    if (req.userRole !== 'admin' && project.userId.toString() !== req.userId) {
-      return res.status(403).json({ message: 'Access denied' });
-    }
-
-    // Mark as read if client is viewing
-    if (req.userRole === 'client' && project.hasUnreadUpdate && project.lastUpdatedBy === 'admin') {
-      project.hasUnreadUpdate = false;
-      await project.save();
-    }
-
-    res.json({
-      commits: project.commits || [],
-      projectName: project.projectName
-    });
-  } catch (error) {
-    console.error('Get commits error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-app.put('/api/admin/projects/requests/:projectId/commit/:weekNumber', verifyToken, verifyAdmin, async (req, res) => {
-  try {
-    const { description, completedTasks } = req.body;
-    const { projectId, weekNumber } = req.params;
-
-    const project = await ProjectRequest.findById(projectId);
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    const commitIndex = project.commits.findIndex(c => c.weekNumber === parseInt(weekNumber));
-    if (commitIndex === -1) {
-      return res.status(404).json({ message: 'Commit not found' });
-    }
-
-    if (description) {
-      project.commits[commitIndex].description = description;
-    }
-    if (completedTasks) {
-      project.commits[commitIndex].completedTasks = completedTasks;
-    }
-
-    project.hasUnreadUpdate = true;
-    project.lastUpdatedBy = 'admin';
-    project.updatedAt = new Date();
-
-    await project.save();
-
-    res.json({
-      message: 'Commit updated successfully',
-      commit: project.commits[commitIndex]
-    });
-  } catch (error) {
-    console.error('Update commit error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-// Delete a Commit (Admin Only)
-app.delete('/api/admin/projects/requests/:projectId/commit/:weekNumber', verifyToken, verifyAdmin, async (req, res) => {
-  try {
-    const { projectId, weekNumber } = req.params;
-
-    const project = await ProjectRequest.findById(projectId);
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
-    }
-
-    const commitIndex = project.commits.findIndex(c => c.weekNumber === parseInt(weekNumber));
-    if (commitIndex === -1) {
-      return res.status(404).json({ message: 'Commit not found' });
-    }
-
-    project.commits.splice(commitIndex, 1);
-    project.updatedAt = new Date();
-
-    await project.save();
-
-    res.json({
-      message: 'Commit deleted successfully',
-      remainingCommits: project.commits
-    });
-  } catch (error) {
-    console.error('Delete commit error:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-//Get Project Statistics including commits count (Admin Dashboard)
-app.get('/api/admin/projects/statistics', verifyToken, verifyAdmin, async (req, res) => {
-  try {
-    const acceptedProjects = await ProjectRequest.find({ status: 'accepted' });
-    
-    const projectsWithCommitStats = acceptedProjects.map(project => ({
-      _id: project._id,
-      projectName: project.projectName,
-      clientId: project.userId,
-      totalCommits: project.commits ? project.commits.length : 0,
-      lastCommitDate: project.commits && project.commits.length > 0 
-        ? project.commits[project.commits.length - 1].date 
-        : null,
-      payment: project.payment,
-      timeline: project.timeline
-    }));
-
-    res.json(projectsWithCommitStats);
-  } catch (error) {
-    console.error('Get statistics error:', error);
+    console.error('Update timeline error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -1141,10 +846,6 @@ connectDB().then(() => {
   app.listen(PORT, () => {
     console.log('=================================');
     console.log(`🚀 Server running on port ${PORT}`);
-    console.log('=================================');
-    console.log('📝 Migration: POST /api/migrate/fix-user-roles');
-    console.log('👤 Client: POST /api/auth/signup');
-    console.log('🛡️  Admin: POST /api/auth/admin/signup (requires ADMIN_SECRET)');
     console.log('=================================');
   });
 });
