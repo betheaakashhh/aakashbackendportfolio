@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 require('dotenv').config();
 
 const app = express();
+connectDB();
 
 // Debug: Check environment variables
 console.log('Environment check:');
@@ -1172,7 +1173,7 @@ app.use((error, req, res, next) => {
   res.status(500).json({ message: 'Internal server error' });
 });
 
-connectDB();
+
 
 module.exports = app;
 
