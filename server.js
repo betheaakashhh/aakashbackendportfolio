@@ -1132,9 +1132,7 @@ app.get('/api/admin/dashboard/stats', verifyToken, verifyAdmin, async (req, res)
 });
 
 // 404 Handler
-app.use('/api', (req, res) => {
-  res.status(404).json({ message: 'API endpoint not found' });
-});
+
 
 // ==================== DEBUG TEST ROUTE ====================
 app.get('/api/auth/test', async (req, res) => {
@@ -1165,6 +1163,9 @@ app.get('/api/auth/test', async (req, res) => {
       error: error.message
     });
   }
+});
+app.use('/api', (req, res) => {
+  res.status(404).json({ message: 'API endpoint not found' });
 });
 
 
