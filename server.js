@@ -1135,20 +1135,51 @@ app.use('/api', (req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
+// ==================== DEBUG TEST ROUTE ====================
+app.get('/api/auth/test', async (req, res) => {
+  try {
+    const dbState = mongoose.connection.readyState; // 0 = Disconnected, 1 = Connected
+
+    const userCount = await User.countDocuments().catch(() => 'DB Query Failed');
+
+    res.json({
+      status: 'API Working ✅',
+      database: dbState === 1 ? 'Connected' : 'Disconnected ❌',
+      dbState,
+      userCount,
+      timestamp: new Date().toISOString(),
+      environment: {
+        node_env: process.env.NODE_ENV,
+        vercel: !!process.env.VERCEL, // true if deployed on vercel
+      },
+      env_check: {
+        MONGODB_URI: process.env.MONGODB_URI ? 'Loaded ✓' : 'Missing ✗',
+        JWT_SECRET: process.env.JWT_SECRET ? 'Loaded ✓' : 'Missing ✗',
+      }
+    });
+  } catch (error) {
+    console.error('Test route error:', error);
+    res.status(500).json({
+      status: 'Server error ❌',
+      error: error.message
+    });
+  }
+});
+
+
 app.use((error, req, res, next) => {
   console.error('Global error:', error);
   res.status(500).json({ message: 'Internal server error' });
 });
 
-// Export the Express app for serverless functions
+connectDB();
+
 module.exports = app;
 
-// Only start the server if not in a serverless environment
+// Local environment only
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
-
-  connectDB().then(() => {
-    app.listen(PORT, () => {
+   app.listen(PORT, () => {
       console.log('=================================');
       console.log(`🚀 Server running on port ${PORT}`);
       console.log('=================================');
@@ -1157,5 +1188,4 @@ if (require.main === module) {
       console.log('🛡️  Admin: POST /api/auth/admin/signup (requires ADMIN_SECRET)');
       console.log('=================================');
     });
-  });
-}
+  }
