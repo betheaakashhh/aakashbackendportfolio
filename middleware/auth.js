@@ -1,7 +1,7 @@
-const jwt = require('jsonwebtoken');
-const { JWT_SECRET } = require('../config/constants');
+import jwt from 'jsonwebtoken';
+import { config } from '../config/env.js';
 
-const verifyToken = (req, res, next) => {
+export const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1];
   
@@ -10,7 +10,7 @@ const verifyToken = (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, config.jwtSecret);
     req.userId = decoded.userId;
     req.userRole = decoded.role || 'client';
     next();
@@ -20,11 +20,9 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-const verifyAdmin = (req, res, next) => {
+export const verifyAdmin = (req, res, next) => {
   if (req.userRole !== 'admin') {
     return res.status(403).json({ message: 'Access denied. Admin only.' });
   }
   next();
 };
-
-module.exports = { verifyToken, verifyAdmin };

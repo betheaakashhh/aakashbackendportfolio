@@ -1,6 +1,27 @@
-# .gitignore content example
+# Dependencies
 node_modules/
-*.log
-.DS_Store
+package-lock.json
+yarn.lock
+
+# Environment variables
 .env
-dist/
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Vercel
+.vercel

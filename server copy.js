@@ -1185,7 +1185,7 @@ if (process.env.NODE_ENV !== 'production') {
       console.log('=================================');
       console.log('📝 Migration: POST /api/migrate/fix-user-roles');
       console.log('👤 Client: POST /api/auth/signup');
-      console.log('🛡️  Admin: POST /api/auth/admin/signup (requires ADMIN_SECRET)');
+      console.log('🛡️  Admin: POST /api/auth/admin/login (requires ADMIN_SECRET)');
       console.log('=================================');
     });
 }

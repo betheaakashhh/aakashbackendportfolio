@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const projectRequestSchema = new mongoose.Schema({
   userId: {
@@ -104,4 +104,6 @@ const projectRequestSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('ProjectRequest', projectRequestSchema);
+const ProjectRequest = mongoose.model('ProjectRequest', projectRequestSchema);
+
+export default ProjectRequest;
