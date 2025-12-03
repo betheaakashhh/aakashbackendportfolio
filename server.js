@@ -44,7 +44,7 @@ app.listen(PORT, () => {
       console.log('📝 Migration: POST /api/migrate/fix-user-roles');
       console.log('👤 Client: POST /api/auth/signup');
       console.log('🛡️  Admin: POST /api/auth/admin/login (requires ADMIN_SECRET)');
-      console.log(`health check:http://localhost:${PORT} GET /api/health`);
+      
 
       console.log('=================================');
 });
