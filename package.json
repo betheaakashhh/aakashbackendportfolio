@@ -20,7 +20,7 @@
     "express-fileupload": "^1.5.2",
     "install": "^0.13.0",
     "jsonwebtoken": "^9.0.0",
-   "mongoose": "8.9.4",
+    "mongoose": "^7.7.0",
     "multer": "^2.0.2",
     "multer-storage-cloudinary": "^4.0.0",
     "npm": "^11.6.2",
