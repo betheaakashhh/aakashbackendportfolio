@@ -39,11 +39,14 @@ app.use((error, req, res, next) => {
 // ==================== START SERVER ====================
 app.listen(PORT, () => {
   console.log('=================================');
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌍 http://localhost:${PORT}`);
-  console.log(`🔗 Environment: ${config.nodeEnv}`);
-  console.log(`🐬 Mongoose: ${mongoose.version}`);
-  console.log('=================================');
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log('=================================');
+      console.log('📝 Migration: POST /api/migrate/fix-user-roles');
+      console.log('👤 Client: POST /api/auth/signup');
+      console.log('🛡️  Admin: POST /api/auth/admin/login (requires ADMIN_SECRET)');
+      console.log(`health check:http://localhost:${port} GET /api/health`);
+
+      console.log('=================================');
 });
 
 export default app;
