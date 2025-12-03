@@ -33,7 +33,9 @@ router.use('/admin', adminRoutes);
 router.use('/migrate', migrationRoutes);
 
 // ==================== 404 HANDLER ====================
-router.use('*', (req, res) => {
+// Use a catch-all middleware without a path string to avoid passing
+// the literal '*' into path-to-regexp (which throws an error).
+router.use((req, res) => {
   res.status(404).json({ message: 'API endpoint not found' });
 });
 
