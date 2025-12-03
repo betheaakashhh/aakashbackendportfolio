@@ -14,18 +14,39 @@ const app = express();
 const PORT = process.env.PORT || config.port || 5000;
 
 // ==================== MIDDLEWARE ====================
-// Apply CORS middleware FIRST
 app.use(corsConfig);
 app.use(handlePreflight);
-
-// Then parse body
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ==================== STATIC FILES with CORS ====================
-// Serve static files from 'public' or 'assets' directory
+// ==================== STATIC FILE SERVING ====================
+// Try different common static directories
+const staticDirs = [
+  'public',
+  'dist',
+  'build',
+  'assets',
+  'static',
+  'client/build'
+];
+
+// Serve static files from multiple possible directories
+staticDirs.forEach(dir => {
+  const dirPath = path.join(__dirname, dir);
+  try {
+    if (fs.existsSync(dirPath)) {
+      console.log(`📁 Serving static files from: ${dir}`);
+      app.use(`/${dir}`, express.static(dirPath));
+      app.use(`/assets`, express.static(path.join(dirPath, 'assets')));
+    }
+  } catch (err) {
+    console.log(`Directory ${dir} not found`);
+  }
+});
+
+// Special route for assets - handle 404 properly
 app.use('/assets', (req, res, next) => {
-  // Apply CORS headers specifically for static files
+  // Set CORS headers
   res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -35,31 +56,47 @@ app.use('/assets', (req, res, next) => {
     return res.sendStatus(200);
   }
   
-  // Serve static files from the correct directory
-  express.static(path.join(__dirname, 'assets'))(req, res, next);
-});
+  next();
+}, express.static(path.join(__dirname, 'assets')));
 
 // ==================== DB CONNECTION ====================
 connectDB();
 
-// ==================== ROOT ROUTE ====================
+// ==================== ROUTES ====================
 app.get('/', (req, res) => {
   res.json({
     message: 'Portfolio API is live 🎯',
     time: new Date().toISOString(),
     server: 'Render Deployment',
     mongoose: mongoose.version,
-    cors: 'Enabled for Vercel frontend'
+    cors: 'Enabled for Vercel frontend',
+    note: 'This is API only. Frontend is hosted separately on Vercel.'
   });
 });
 
 // ==================== API ROUTES ====================
 app.use('/api', router);
 
-// ==================== GLOBAL ERROR HANDLER ====================
-app.use((error, req, res, next) => {
-  console.error('Global error:', error);
-  res.status(500).json({ error: 'Internal Server Error' });
+// ==================== CATCH-ALL FOR STATIC FILES ====================
+// If file doesn't exist, return proper 404 for assets
+app.get('/assets/*', (req, res) => {
+  res.status(404).json({
+    error: 'Asset not found',
+    path: req.path,
+    message: 'This is a backend API server. Frontend assets are hosted on Vercel.'
+  });
+});
+
+// ==================== 404 HANDLER FOR API ROUTES ====================
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl,
+    availableRoutes: {
+      api: '/api/*',
+      root: '/'
+    }
+  });
 });
 
 // ==================== START SERVER ====================
@@ -67,8 +104,8 @@ app.listen(PORT, () => {
   console.log('=================================');
   console.log(`🚀 Server running on port ${PORT}`);
   console.log('=================================');
-  console.log(`✅ CORS enabled for: ${config.frontendUrl}`);
-  console.log(`✅ CORS enabled for: ${config.adminUrl}`);
+  console.log('📝 This is a BACKEND ONLY server');
+  console.log('🌐 Frontend is hosted separately on Vercel');
   console.log('=================================');
 });
 
