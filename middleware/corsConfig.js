@@ -6,9 +6,7 @@ const allowedOrigins = [
   'http://localhost:5173', 
   'http://localhost:5174',
   'http://localhost:3001',
-  
-  'https://aakashkumarsahu.vercel.app',
-  'https://aakashkumarsahu.vercel.app/',
+  'https://aakash-kumar-sahu-portfolio.vercel.app',
   config.frontendUrl,
   config.adminUrl
 ].filter(Boolean);
