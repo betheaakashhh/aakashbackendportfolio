@@ -79,7 +79,7 @@ app.use('/api', router);
 
 // ==================== CATCH-ALL FOR STATIC FILES ====================
 // If file doesn't exist, return proper 404 for assets
-app.get('/assets/*', (req, res) => {
+app.get('/assets/*path', (req, res) => {
   res.status(404).json({
     error: 'Asset not found',
     path: req.path,
