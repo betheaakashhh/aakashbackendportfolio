@@ -64,24 +64,6 @@ app.get('/', (req, res) => {
 // ==================== API ROUTES ====================
 app.use('/api', router);
 
-// ==================== CATCH-ALL FOR STATIC FILES ====================
-// If file doesn't exist, return proper 404 for assets
-// Assets not found handling
-app.get('/assets/*', (req, res) => {
-  res.status(404).json({
-    error: 'Asset not found',
-    path: req.path,
-    message: 'Frontend is hosted on Vercel'
-  });
-});
-
-// Catch-all for unmatched routes
-app.use('(.*)', (req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.originalUrl
-  });
-});
 
 
 // ==================== START SERVER ====================
