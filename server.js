@@ -5,10 +5,7 @@ import connectDB from './config/db.js';
 import { corsConfig, handlePreflight } from './middleware/corsConfig.js';
 import router from './routes/router.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || config.port || 5000;
@@ -19,30 +16,6 @@ app.use(handlePreflight);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ==================== STATIC FILE SERVING ====================
-// Try different common static directories
-const staticDirs = [
-  'public',
-  'dist',
-  'build',
-  'assets',
-  'static',
-  'client/build'
-];
-
-// Serve static files from multiple possible directories
-staticDirs.forEach(dir => {
-  const dirPath = path.join(__dirname, dir);
-  try {
-    if (fs.existsSync(dirPath)) {
-      console.log(`📁 Serving static files from: ${dir}`);
-      app.use(`/${dir}`, express.static(dirPath));
-      app.use(`/assets`, express.static(path.join(dirPath, 'assets')));
-    }
-  } catch (err) {
-    console.log(`Directory ${dir} not found`);
-  }
-});
 
 
 
