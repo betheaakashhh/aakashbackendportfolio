@@ -4,6 +4,7 @@ import authRoutes from './authRoutes.js';
 import projectRoutes from './projectRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import migrationRoutes from './migration.js';
+import resumeRoutes from './resumeRoutes.js';
 
 const router = express.Router();
 
@@ -31,6 +32,7 @@ router.use('/auth', authRoutes);
 router.use('/projects', projectRoutes);
 router.use('/admin', adminRoutes);
 router.use('/migrate', migrationRoutes);
+router.use("/resume", resumeRoutes);
 
 // ==================== 404 HANDLER ====================
 // Use a catch-all middleware without a path string to avoid passing
