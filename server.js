@@ -44,20 +44,7 @@ staticDirs.forEach(dir => {
   }
 });
 
-// Special route for assets - handle 404 properly
-app.use('/assets', (req, res, next) => {
-  // Set CORS headers
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
-  }
-  
-  next();
-}, express.static(path.join(__dirname, 'assets')));
+
 
 // ==================== DB CONNECTION ====================
 connectDB();
@@ -79,25 +66,23 @@ app.use('/api', router);
 
 // ==================== CATCH-ALL FOR STATIC FILES ====================
 // If file doesn't exist, return proper 404 for assets
-app.get('/assets/*path', (req, res) => {
+// Assets not found handling
+app.get('/assets/*', (req, res) => {
   res.status(404).json({
     error: 'Asset not found',
     path: req.path,
-    message: 'This is a backend API server. Frontend assets are hosted on Vercel.'
+    message: 'Frontend is hosted on Vercel'
   });
 });
 
-// ==================== 404 HANDLER FOR API ROUTES ====================
-app.use('*', (req, res) => {
+// Catch-all for unmatched routes
+app.use('(.*)', (req, res) => {
   res.status(404).json({
     error: 'Route not found',
-    path: req.originalUrl,
-    availableRoutes: {
-      api: '/api/*',
-      root: '/'
-    }
+    path: req.originalUrl
   });
 });
+
 
 // ==================== START SERVER ====================
 app.listen(PORT, () => {
