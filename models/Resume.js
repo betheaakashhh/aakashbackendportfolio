@@ -1,68 +1,72 @@
 // models/Resume.js
 import mongoose from 'mongoose';
 
+// ================= EDUCATION =================
 const educationSchema = new mongoose.Schema({
-  institution: { type: String, required: true, trim: true },
-  course: { type: String, required: true, trim: true },
-  location: { type: String, required: true, trim: true },
-  startYear: { type: String, required: true },
-  endYear: { type: String, required: true },
-  cgpa: { type: String, trim: true }
+  institution: { type: String, trim: true, default: "" },
+  course: { type: String, trim: true, default: "" },
+  location: { type: String, trim: true, default: "" },
+  startYear: { type: String, default: "" },
+  endYear: { type: String, default: "" },
+  cgpa: { type: String, trim: true, default: "" }
 }, { _id: true });
 
+// ================= CERTIFICATIONS =================
 const certificationSchema = new mongoose.Schema({
-  title: { type: String, required: true, trim: true },
-  issuer: { type: String, required: true, trim: true },
-  year: { type: String, required: true },
-  description: { type: String, trim: true },
-  certificateLink: { type: String, trim: true }
+  title: { type: String, trim: true, default: "" },
+  issuer: { type: String, trim: true, default: "" },
+  year: { type: String, default: "" },
+  description: { type: String, trim: true, default: "" },
+  certificateLink: { type: String, trim: true, default: "" }
 }, { _id: true });
 
+// ================= PROJECTS =================
 const projectSchema = new mongoose.Schema({
-  name: { type: String, required: true, trim: true },
-  description: { type: String, required: true, trim: true },
-  technologies: { type: String, trim: true },
-  githubLink: { type: String, trim: true },
-  liveLink: { type: String, trim: true },
-  startDate: { type: String },
-  endDate: { type: String }
+  name: { type: String, trim: true, default: "" },
+  description: { type: String, trim: true, default: "" },
+  technologies: { type: String, trim: true, default: "" },
+  githubLink: { type: String, trim: true, default: "" },
+  liveLink: { type: String, trim: true, default: "" },
+  startDate: { type: String, default: "" },
+  endDate: { type: String, default: "" }
 }, { _id: true });
 
+// ================= EXTRACURRICULAR =================
 const extracurricularSchema = new mongoose.Schema({
-  title: { type: String, required: true, trim: true },
-  organization: { type: String, trim: true },
-  year: { type: String, required: true },
-  description: { type: String, required: true, trim: true },
-  role: { type: String, trim: true }
+  title: { type: String, trim: true, default: "" },
+  organization: { type: String, trim: true, default: "" },
+  year: { type: String, default: "" },
+  description: { type: String, trim: true, default: "" },
+  role: { type: String, trim: true, default: "" }
 }, { _id: true });
 
+// ================= CUSTOM SECTIONS =================
 const customSectionSchema = new mongoose.Schema({
-  heading: { type: String, required: true, trim: true },
+  heading: { type: String, trim: true, default: "" },
   items: [{
-    title: String,
-    description: String,
-    date: String,
-    additionalInfo: String
+    title: { type: String, trim: true, default: "" },
+    description: { type: String, trim: true, default: "" },
+    date: { type: String, default: "" },
+    additionalInfo: { type: String, trim: true, default: "" }
   }]
 }, { _id: true });
 
+// ================= MAIN RESUME SCHEMA =================
 const resumeSchema = new mongoose.Schema({
-  // 🔹 Personal Info with safe defaults
-  fullName: { type: String, default: "", trim: true },
-  title: { type: String, default: "", trim: true },
-  email: { type: String, default: "", trim: true },
-  phone: { type: String, default: "", trim: true },
-  location: { type: String, default: "", trim: true },
-  portfolio: { type: String, default: "", trim: true },
-  linkedin: { type: String, default: "", trim: true },
-  github: { type: String, default: "", trim: true },
-  summary: { type: String, default: "", trim: true },
+  fullName: { type: String, trim: true, default: "" },
+  title: { type: String, trim: true, default: "" },
+  email: { type: String, trim: true, default: "" },
+  phone: { type: String, trim: true, default: "" },
+  location: { type: String, trim: true, default: "" },
+  portfolio: { type: String, trim: true, default: "" },
+  linkedin: { type: String, trim: true, default: "" },
+  github: { type: String, trim: true, default: "" },
+  summary: { type: String, trim: true, default: "" },
 
-  // 🔹 Array sections must always exist
   skills: {
     type: [{
-      category: String,
-      items: [String]
+      category: { type: String, trim: true, default: "" },
+      items: { type: [String], default: [] }
     }],
     default: []
   },
@@ -73,17 +77,14 @@ const resumeSchema = new mongoose.Schema({
   extracurricular: { type: [extracurricularSchema], default: [] },
   customSections: { type: [customSectionSchema], default: [] },
 
-  // Publish settings
   isPublished: { type: Boolean, default: false },
   lastUpdated: { type: Date, default: Date.now }
-
 }, { timestamps: true });
 
-// Auto update lastUpdated
-resumeSchema.pre('save', function (next) {
+resumeSchema.pre("save", function (next) {
   this.lastUpdated = new Date();
   next();
 });
 
-const Resume = mongoose.model('Resume', resumeSchema);
+const Resume = mongoose.model("Resume", resumeSchema);
 export default Resume;
