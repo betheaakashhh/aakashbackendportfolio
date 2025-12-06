@@ -5,6 +5,7 @@ import projectRoutes from './projectRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import migrationRoutes from './migration.js';
 import resumeRoutes from './resumeRoutes.js';
+import visitorRoutes from './visitorRoutes.js'
 
 const router = express.Router();
 
@@ -21,7 +22,8 @@ router.get('/health', (req, res) => {
       auth: '/api/auth',
       projects: '/api/projects',
       admin: '/api/admin',
-      migration: '/api/migrate'
+      migration: '/api/migrate',
+      visitor: 'api/resume'
     }
   };
   res.json(healthData);
@@ -33,6 +35,7 @@ router.use('/projects', projectRoutes);
 router.use('/admin', adminRoutes);
 router.use('/migrate', migrationRoutes);
 router.use("/resume", resumeRoutes);
+router.use("/resume", visitorRoutes);
 
 // ==================== 404 HANDLER ====================
 // Use a catch-all middleware without a path string to avoid passing
