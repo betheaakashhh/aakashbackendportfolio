@@ -153,5 +153,47 @@ router.get('/:id/commits', verifyToken, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+// GET PROJECT INVOICES (for client)
+router.get('/:id/invoices', verifyToken, async (req, res) => {
+  try {
+    const project = await ProjectRequest.findById(req.params.id);
+    
+    if (!project) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Project not found' 
+      });
+    }
+
+    // Check authorization - only project owner or admin
+    if (req.userRole !== 'admin' && project.userId.toString() !== req.userId) {
+      return res.status(403).json({ 
+        success: false,
+        message: 'Access denied' 
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        projectId: project._id,
+        projectName: project.projectName,
+        invoices: project.invoices || [],
+        paymentSummary: {
+          totalBudget: project.payment?.finalBudget || 0,
+          paidAmount: project.payment?.paidAmount || 0,
+          dueAmount: project.payment?.dueAmount || 0,
+          initialPaymentMade: project.payment?.initialPayment || false
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get project invoices error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error: ' + error.message 
+    });
+  }
+});
 
 export default router;
