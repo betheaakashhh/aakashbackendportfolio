@@ -122,105 +122,350 @@ router.get('/projects/requests/:id', verifyToken, verifyAdmin, async (req, res) 
 // ACCEPT PROJECT REQUEST
 router.put('/projects/requests/:id/accept', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { finalBudget, startDate, deadline } = req.body;
+    const { finalBudget, startDate, deadline, initialPayment = false, createInitialInvoice = false } = req.body;
+
+    console.log('✅ Accepting project:', req.params.id);
+    console.log('📋 Accept data:', req.body);
 
     const project = await ProjectRequest.findById(req.params.id);
     if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+      return res.status(404).json({ 
+        success: false,
+        message: 'Project not found' 
+      });
     }
 
     project.status = 'accepted';
+    
+    // Set final budget (use provided or existing)
+    const projectBudget = finalBudget || project.budget || 0;
+    
+    // Initialize payment object
     project.payment = {
-      finalBudget: finalBudget || project.budget,
-      paidAmount: 0,
-      dueAmount: finalBudget || project.budget,
-      paymentHistory: []
+      finalBudget: projectBudget,
+      initialPayment: initialPayment,
+      paidAmount: initialPayment ? projectBudget * 0.5 : 0,
+      dueAmount: initialPayment ? projectBudget * 0.5 : projectBudget,
+      paymentHistory: [],
+      fullyPaid: false
     };
+
+    // Add initial payment record if provided
+    if (initialPayment && projectBudget > 0) {
+      project.payment.paymentHistory.push({
+        amount: projectBudget * 0.5,
+        date: new Date(),
+        note: 'Initial deposit upon project acceptance',
+        isInitialPayment: true,
+        paymentMethod: 'Bank Transfer'
+      });
+    }
+
+    // Create initial invoice if requested
+    if (createInitialInvoice && projectBudget > 0) {
+      const timestamp = Date.now();
+      const random = Math.floor(Math.random() * 1000);
+      const prefix = project.projectName.substring(0, 3).toUpperCase();
+      const invoiceNumber = `INV-${prefix}-${timestamp}-INITIAL`;
+      
+      const initialInvoice = {
+        invoiceNumber,
+        issueDate: new Date(),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        invoiceType: 'initial',
+        items: [{
+          description: 'Initial Deposit - Project Kickoff',
+          quantity: 1,
+          unitPrice: projectBudget * 0.5,
+          total: projectBudget * 0.5
+        }],
+        subtotal: projectBudget * 0.5,
+        tax: 0,
+        totalAmount: projectBudget * 0.5,
+        amountPaid: initialPayment ? projectBudget * 0.5 : 0,
+        balanceDue: initialPayment ? 0 : projectBudget * 0.5,
+        status: initialPayment ? 'paid' : 'pending',
+        paymentMethod: 'Bank Transfer',
+        notes: `Initial invoice for ${project.projectName}`
+      };
+      
+      if (!project.invoices) {
+        project.invoices = [];
+      }
+      project.invoices.push(initialInvoice);
+      
+      console.log('📄 Initial invoice created:', invoiceNumber);
+    }
+
+    // Set timeline
     project.timeline = {
-      startDate: startDate || new Date(),
-      deadline: deadline || null
+      startDate: startDate ? new Date(startDate) : new Date(),
+      deadline: deadline ? new Date(deadline) : null,
+      completedDate: null
     };
+
+    // Set notification flags
     project.hasUnreadUpdate = true;
     project.lastUpdatedBy = 'admin';
-    project.updatedAt = new Date();
-
+    
     await project.save();
 
     res.json({
-      message: 'Project accepted successfully',
-      project
+      success: true,
+      message: initialPayment 
+        ? 'Project accepted with initial payment' + (createInitialInvoice ? ' and invoice created' : '')
+        : 'Project accepted successfully',
+      data: {
+        project: {
+          id: project._id,
+          projectName: project.projectName,
+          status: project.status,
+          payment: project.payment,
+          timeline: project.timeline,
+          invoices: project.invoices || []
+        }
+      }
     });
   } catch (error) {
-    console.error('Accept project error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Accept project error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error: ' + error.message 
+    });
   }
 });
 
-// NEGOTIATE PROJECT REQUEST
-router.put('/projects/requests/:id/negotiate', verifyToken, verifyAdmin, async (req, res) => {
+router.post('/projects/requests/:id/invoice', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { proposedBudget, proposedDuration, adminNotes } = req.body;
+    const { 
+      invoiceType = 'standard', 
+      items, 
+      dueDate, 
+      taxRate = 0, 
+      paymentMethod = 'Bank Transfer', 
+      notes 
+    } = req.body;
 
-    const project = await ProjectRequest.findById(req.params.id);
+    console.log('📝 Creating invoice for project:', req.params.id);
+    console.log('📦 Invoice data:', req.body);
+
+    const project = await ProjectRequest.findById(req.params.id)
+      .populate('userId', 'name email contact company');
+    
     if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+      console.error('❌ Project not found:', req.params.id);
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
     }
 
-    project.status = 'negotiable';
-    project.negotiation = {
-      proposedBudget: proposedBudget || project.budget,
-      proposedDuration: proposedDuration || project.duration,
-      adminNotes: adminNotes || '',
-      negotiatedAt: new Date()
+    if (project.status !== 'accepted') {
+      console.error('❌ Invalid project status for invoice:', project.status);
+      return res.status(400).json({
+        success: false,
+        message: 'Can only create invoices for accepted projects'
+      });
+    }
+
+    // Validate items
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one invoice item is required'
+      });
+    }
+
+    // Calculate totals
+    const subtotal = items.reduce((sum, item) => {
+      const itemTotal = (item.quantity || 1) * (item.unitPrice || 0);
+      return sum + itemTotal;
+    }, 0);
+    
+    const tax = subtotal * (taxRate / 100);
+    const totalAmount = subtotal + tax;
+
+    // Generate invoice number
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    const prefix = project.projectName.substring(0, 3).toUpperCase();
+    const invoiceNumber = `INV-${prefix}-${timestamp}-${random}`;
+
+    // Create invoice
+    const invoice = {
+      invoiceNumber,
+      issueDate: new Date(),
+      dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      invoiceType,
+      items: items.map(item => ({
+        description: item.description || 'Project Service',
+        quantity: item.quantity || 1,
+        unitPrice: item.unitPrice || 0,
+        total: (item.quantity || 1) * (item.unitPrice || 0)
+      })),
+      subtotal,
+      tax,
+      totalAmount,
+      amountPaid: 0,
+      balanceDue: totalAmount,
+      status: 'pending',
+      paymentMethod,
+      notes: notes || `Invoice for ${project.projectName}`
     };
+
+    console.log('✅ Invoice created:', invoiceNumber);
+
+    // Add to project
+    if (!project.invoices) {
+      project.invoices = [];
+    }
+    
+    project.invoices.push(invoice);
     project.hasUnreadUpdate = true;
     project.lastUpdatedBy = 'admin';
     project.updatedAt = new Date();
 
     await project.save();
 
-    res.json({
-      message: 'Negotiation proposal sent successfully',
-      project
+    res.status(201).json({
+      success: true,
+      message: 'Invoice created successfully',
+      data: {
+        invoice,
+        projectName: project.projectName,
+        clientName: project.userId.name
+      }
     });
+
   } catch (error) {
-    console.error('Negotiate project error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Create invoice error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
   }
 });
 
-// REJECT PROJECT REQUEST
-router.put('/projects/requests/:id/reject', verifyToken, verifyAdmin, async (req, res) => {
+// MARK INVOICE AS PAID (ADMIN ONLY)
+router.put('/projects/requests/:projectId/invoices/:invoiceNumber/pay', verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { reason } = req.body;
+    const { projectId, invoiceNumber } = req.params;
+    const { amount, paymentMethod = 'Bank Transfer', note, isInitialPayment = false } = req.body;
 
-    if (!reason) {
-      return res.status(400).json({ message: 'Rejection reason is required' });
-    }
+    console.log('💰 Marking invoice as paid:', invoiceNumber, 'for project:', projectId);
 
-    const project = await ProjectRequest.findById(req.params.id);
+    const project = await ProjectRequest.findById(projectId);
     if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
     }
 
-    project.status = 'rejected';
-    project.rejection = {
-      reason,
-      rejectedAt: new Date()
-    };
+    // Find the invoice
+    const invoice = project.invoices.find(inv => inv.invoiceNumber === invoiceNumber);
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: 'Invoice not found'
+      });
+    }
+
+    const paymentAmount = amount || invoice.balanceDue;
+
+    // Update invoice
+    invoice.amountPaid += paymentAmount;
+    invoice.balanceDue = invoice.totalAmount - invoice.amountPaid;
+    invoice.status = invoice.balanceDue <= 0 ? 'paid' : 'partial';
+    invoice.paymentMethod = paymentMethod;
+
+    // Update project payment if this is initial payment
+    if (isInitialPayment && invoice.invoiceType === 'initial') {
+      project.payment.initialPayment = true;
+    }
+
+    // Add to payment history
+    if (!project.payment.paymentHistory) {
+      project.payment.paymentHistory = [];
+    }
+    
+    project.payment.paymentHistory.push({
+      amount: paymentAmount,
+      date: new Date(),
+      note: note || `Payment for invoice ${invoiceNumber}`,
+      invoiceNumber,
+      paymentMethod,
+      isInitialPayment
+    });
+
+    // Update payment totals
+    project.payment.paidAmount += paymentAmount;
+    project.payment.dueAmount = project.payment.finalBudget - project.payment.paidAmount;
+    project.payment.fullyPaid = project.payment.dueAmount <= 0;
+
     project.hasUnreadUpdate = true;
     project.lastUpdatedBy = 'admin';
     project.updatedAt = new Date();
 
     await project.save();
 
+    console.log('✅ Invoice marked as paid:', invoiceNumber);
+
     res.json({
-      message: 'Project rejected successfully',
-      project
+      success: true,
+      message: 'Payment recorded successfully',
+      data: {
+        invoice,
+        projectPayment: {
+          paidAmount: project.payment.paidAmount,
+          dueAmount: project.payment.dueAmount,
+          initialPaymentMade: project.payment.initialPayment,
+          fullyPaid: project.payment.fullyPaid
+        }
+      }
     });
+
   } catch (error) {
-    console.error('Reject project error:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('❌ Mark invoice as paid error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
+  }
+});
+
+// GET PROJECT INVOICES (ADMIN VIEW)
+router.get('/projects/requests/:id/invoices', verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const project = await ProjectRequest.findById(req.params.id);
+    
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        projectName: project.projectName,
+        invoices: project.invoices || [],
+        paymentSummary: {
+          totalBudget: project.payment?.finalBudget || 0,
+          paidAmount: project.payment?.paidAmount || 0,
+          dueAmount: project.payment?.dueAmount || 0,
+          initialPaymentMade: project.payment?.initialPayment || false
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Get project invoices error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error: ' + error.message
+    });
   }
 });
 
@@ -410,6 +655,8 @@ router.get('/projects/statistics', verifyToken, verifyAdmin, async (req, res) =>
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+
 
 // GET DASHBOARD STATS
 router.get('/dashboard/stats', verifyToken, verifyAdmin, async (req, res) => {

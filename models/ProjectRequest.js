@@ -1,3 +1,4 @@
+
 import mongoose from 'mongoose';
 
 const projectRequestSchema = new mongoose.Schema({
@@ -51,18 +52,92 @@ const projectRequestSchema = new mongoose.Schema({
     rejectedAt: Date
   },
   payment: {
-    finalBudget: Number,
+    finalBudget: {
+      type: Number,
+      default: 0
+    },
+    initialPayment: {
+      type: Boolean,
+      default: false
+    },
     paidAmount: {
       type: Number,
       default: 0
     },
-    dueAmount: Number,
+    dueAmount: {
+      type: Number,
+      default: 0
+    },
     paymentHistory: [{
       amount: Number,
-      date: Date,
-      note: String
-    }]
+      date: {
+        type: Date,
+        default: Date.now
+      },
+      note: String,
+      invoiceNumber: String,
+      paymentMethod: String,
+      isInitialPayment: {
+        type: Boolean,
+        default: false
+      }
+    }],
+    fullyPaid: {
+      type: Boolean,
+      default: false
+    }
   },
+  
+  // INVOICES ARRAY
+  invoices: [{
+    invoiceNumber: {
+      type: String,
+      required: true,
+      unique: true
+    },
+    issueDate: {
+      type: Date,
+      default: Date.now
+    },
+    dueDate: Date,
+    invoiceType: {
+      type: String,
+      enum: ['initial', 'milestone', 'final', 'standard'],
+      default: 'standard'
+    },
+    items: [{
+      description: String,
+      quantity: {
+        type: Number,
+        default: 1
+      },
+      unitPrice: Number,
+      total: Number
+    }],
+    subtotal: Number,
+    tax: {
+      type: Number,
+      default: 0
+    },
+    totalAmount: Number,
+    amountPaid: {
+      type: Number,
+      default: 0
+    },
+    balanceDue: Number,
+    status: {
+      type: String,
+      enum: ['pending', 'paid', 'overdue', 'cancelled', 'partial'],
+      default: 'pending'
+    },
+    paymentMethod: String,
+    notes: String,
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  
   timeline: {
     startDate: Date,
     deadline: Date,
@@ -93,15 +168,77 @@ const projectRequestSchema = new mongoose.Schema({
     type: String,
     enum: ['client', 'admin'],
     default: 'client'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
   }
+}, {
+  timestamps: true
+});
+
+// Middleware to automatically update due amount and status
+projectRequestSchema.pre('save', function(next) {
+  // Update payment calculations
+  if (this.payment && this.payment.finalBudget !== undefined) {
+    this.payment.dueAmount = this.payment.finalBudget - (this.payment.paidAmount || 0);
+    this.payment.fullyPaid = this.payment.dueAmount <= 0;
+  }
+  
+  // Update invoice balance due
+  if (this.invoices && this.invoices.length > 0) {
+    this.invoices.forEach(invoice => {
+      if (invoice.totalAmount !== undefined && invoice.amountPaid !== undefined) {
+        invoice.balanceDue = invoice.totalAmount - invoice.amountPaid;
+        
+        // Update invoice status based on balance
+        if (invoice.balanceDue <= 0) {
+          invoice.status = 'paid';
+        } else if (invoice.balanceDue > 0 && invoice.amountPaid > 0) {
+          invoice.status = 'partial';
+        }
+        
+        // Check if invoice is overdue
+        if (invoice.dueDate && new Date() > invoice.dueDate && invoice.status !== 'paid') {
+          invoice.status = 'overdue';
+        }
+      }
+    });
+  }
+  
+  next();
+});
+
+// Virtual for payment progress percentage
+projectRequestSchema.virtual('paymentProgress').get(function() {
+  if (!this.payment || !this.payment.finalBudget || this.payment.finalBudget === 0) {
+    return 0;
+  }
+  return Math.round((this.payment.paidAmount / this.payment.finalBudget) * 100);
+});
+
+// Virtual for total invoice amount
+projectRequestSchema.virtual('totalInvoiceAmount').get(function() {
+  if (!this.invoices || this.invoices.length === 0) {
+    return 0;
+  }
+  return this.invoices.reduce((total, invoice) => total + (invoice.totalAmount || 0), 0);
+});
+
+// Virtual for pending invoice amount
+projectRequestSchema.virtual('pendingInvoiceAmount').get(function() {
+  if (!this.invoices || this.invoices.length === 0) {
+    return 0;
+  }
+  return this.invoices
+    .filter(invoice => invoice.status === 'pending' || invoice.status === 'partial')
+    .reduce((total, invoice) => total + (invoice.balanceDue || 0), 0);
+});
+
+// Virtual for paid invoice amount
+projectRequestSchema.virtual('paidInvoiceAmount').get(function() {
+  if (!this.invoices || this.invoices.length === 0) {
+    return 0;
+  }
+  return this.invoices
+    .filter(invoice => invoice.status === 'paid')
+    .reduce((total, invoice) => total + (invoice.totalAmount || 0), 0);
 });
 
 const ProjectRequest = mongoose.model('ProjectRequest', projectRequestSchema);
