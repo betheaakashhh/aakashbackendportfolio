@@ -33,7 +33,7 @@ export const corsConfig = cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With','x-device-id'],
   exposedHeaders: ['Content-Length', 'Content-Type'] // Expose these headers
 });
 
@@ -59,7 +59,7 @@ export const handlePreflight = (req, res, next) => {
     if (allowedOrigins.includes(origin) || !origin || origin.endsWith('.vercel.app')) {
       res.header('Access-Control-Allow-Origin', origin || '*');
       res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With','x-device-id');
       res.header('Access-Control-Allow-Credentials', 'true');
       res.header('Access-Control-Max-Age', '86400'); // 24 hours
     }

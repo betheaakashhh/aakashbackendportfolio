@@ -693,5 +693,7 @@ router.get('/dashboard/stats', verifyToken, verifyAdmin, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+// GET: Admin — Full blog data
+
 
 export default router;
