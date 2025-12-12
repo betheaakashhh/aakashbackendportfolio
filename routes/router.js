@@ -8,6 +8,7 @@ import resumeRoutes from './resumeRoutes.js';
 import visitorRoutes from './visitorRoutes.js';
 import invoiceRoutes from './invoiceRoutes.js';
 import blogRoutes from './blogRoutes.js';
+import updateInfoRoutes from "./updateInfoRoutes.js";
 
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.use("/resume", resumeRoutes);
 router.use("/resume", visitorRoutes);
 router.use("/invoices", invoiceRoutes);
 router.use("/blogs", blogRoutes);
+router.use("/update-info", updateInfoRoutes);
 
 
 // ==================== 404 HANDLER ====================

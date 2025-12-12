@@ -2,6 +2,7 @@ import express from 'express';
 import User from '../models/User.js';
 import ProjectRequest from '../models/ProjectRequest.js';
 import { verifyToken, verifyAdmin } from '../middleware/auth.js';
+import Update from '../models/UpdateInfo.js';
 
 const router = express.Router();
 
@@ -694,6 +695,25 @@ router.get('/dashboard/stats', verifyToken, verifyAdmin, async (req, res) => {
   }
 });
 // GET: Admin — Full blog data
+router.post("/update-info", verifyAdmin, verifyToken ,async (req, res)=>{
+    try {
+    const { id, title, description, type, link, expiresAt } = req.body;
+    
+    Update = {
+      id: id || `update_${Date.now()}`,
+      hasUpdate: true,
+      title,
+      description,
+      type: type || 'update',
+      link,
+      expiresAt
+    };
+    
+    res.json({ success: true, Update });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update notification' });
+  }
+})
 
 
 export default router;
