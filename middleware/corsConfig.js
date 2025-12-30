@@ -6,10 +6,10 @@ const allowedOrigins = [
   'http://localhost:5173', 
   'http://localhost:5174',
   'http://localhost:3001',
-  'https://aakash-kumar-sahu-portfolio.vercel.app',
-  'https://*.vercel.app', // Allow all Vercel subdomains
-  config.frontendUrl,
-  config.adminUrl
+  'https://aakashsahu.vercel.app',
+   process.env.FRONTEND_URL, // Allow all Vercel subdomains
+  config.FRONTEND_URL,
+  config.ADMIN_URL,
 ].filter(Boolean);
 
 // Main CORS configuration for API routes
