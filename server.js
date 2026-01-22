@@ -25,7 +25,7 @@ connectDB();
 // ==================== ROUTES ====================
 app.get('/', (req, res) => {
   res.json({
-    message: 'Portfolio API is live 🎯',
+    message: 'Portfolio API is live ',
     time: new Date().toISOString(),
     server: 'Render Deployment',
     mongoose: mongoose.version,
@@ -42,10 +42,10 @@ app.use('/api', router);
 // ==================== START SERVER ====================
 app.listen(PORT, () => {
   console.log('=================================');
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(` Server running on port ${PORT}`);
   console.log('=================================');
-  console.log('📝 This is a BACKEND ONLY server');
-  console.log('🌐 Frontend is hosted separately on Vercel');
+  console.log('This is a BACKEND ONLY server');
+  console.log(' Frontend is hosted separately on Vercel');
   console.log('=================================');
 });
 
